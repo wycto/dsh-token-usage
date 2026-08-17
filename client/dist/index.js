@@ -130,8 +130,11 @@ const css = `
 .tokuse-table td { padding: 7px 10px; border-bottom: 1px solid rgba(122,132,152,0.12); }
 .tokuse-table tr:hover td { background: rgba(80,110,180,0.12); }
 .tokuse-empty { text-align: center; color: var(--tokuse-dim, #9aa3b5); padding: 40px 0; font-size: 13px; }
-.tokuse-launcher { cursor: pointer; border: 1px solid var(--tokuse-border, #3a4150); background: linear-gradient(180deg, #2f6fed, #2459c8); color: #fff; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(47,111,237,0.35); white-space: nowrap; }
-.tokuse-launcher:hover { background: linear-gradient(180deg, #3a7bfc, #2a64dc); }
+.tokuse-layer { position: relative; }
+.tokuse-footerActions { display: flex; align-items: center; gap: 4px; padding: 4px; }
+.tokuse-badge { cursor: pointer; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary, #9aa3b5); display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; line-height: 18px; min-width: 0; white-space: nowrap; }
+.tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,0.06)); color: var(--dsw-alias-label-primary, #e8eaf0); }
+.tokuse-badgeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tokuse-status { font-size: 12px; color: #7ab8ff; }
 .tokuse-sid { color: #7ab8ff; cursor: pointer; text-decoration: underline dotted; }
 .tokuse-sid:hover { color: #b8dcff; }
@@ -150,11 +153,18 @@ const css = `
 .tokuse-detail-row .v { word-break: break-all; }
 .tokuse-sort-mark { opacity: 0.6; margin-left: 3px; }
 `;
-function Launcher() {
+function Launcher(props) {
   const open = usePanelOpen();
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { className: "tokuse-launcher", title: "\u6253\u5F00 Token \u7528\u91CF\u7EDF\u8BA1\u9762\u677F", onClick: () => setPanelOpen(!open), children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16 }, children: "\u26C3" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Token \u7528\u91CF" })
+  const wide = !!(props && props.wide);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-layer", onClick: (e) => {
+    e.stopPropagation();
+    setPanelOpen(!open);
+  }, children: [
+    open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {}) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-footerActions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "tokuse-badge", "aria-label": "Token \u7528\u91CF\u7EDF\u8BA1", "aria-expanded": open, title: "Token \u7528\u91CF\u7EDF\u8BA1", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u26C3" }),
+      wide ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-badgeLabel", children: "Token \u7528\u91CF" }) : null
+    ] }) })
   ] });
 }
 function Detail({ rec, onClose }) {
@@ -418,7 +428,7 @@ function Panel() {
       ] }, "pager")
     );
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-overlay", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-overlay", onClick: (e) => e.stopPropagation(), children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-header", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-title", children: "Token \u7528\u91CF\u7EDF\u8BA1" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-status", children: loading ? "\u52A0\u8F7D\u4E2D\u2026" : data ? data.counts.matching + " / " + data.counts.total + " \u6761" : "" }),
@@ -464,8 +474,12 @@ function Panel() {
 function apply(ctx) {
   if (typeof styles !== "undefined" && styles.insert) styles.insert(css);
   _conn = ctx.get("connection") || null;
-  ctx.slots.register({ name: "sidebar.footer.action", id: "token-usage-launcher", order: 10, label: "Token \u7528\u91CF" }, Launcher);
-  ctx.slots.register({ name: "shell.overlay", id: "token-usage-panel", order: 10 }, Panel);
+  const slots = ctx.get("slots");
+  if (!slots) return;
+  slots.inject("sidebar.footer.action", () => slots.register(
+    { name: "sidebar.footer.action", id: "token-usage", order: 10, label: "Token \u7528\u91CF" },
+    Launcher
+  ));
 }
 const inject = ["slots", "connection"];
 
