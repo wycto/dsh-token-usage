@@ -16,6 +16,7 @@
     "access": "public"
   },
   "exports": {
+    ".": "./lib/index.js",
     "./client": "./client/dist/index.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

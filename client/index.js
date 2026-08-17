@@ -15,6 +15,22 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 
+// ---------- Host RPC 桥接(静态插件) ----------
+// dsh rc.6 静态插件没有 host 全局; 通过 ctx.connection.rpc.call 调用 Host。
+// apply(ctx) 里从 ctx.connection 初始化, 组件内统一用 rpcCall(method, args)。
+let _conn = null
+function rpcCall(method, args) {
+  if (!_conn || !_conn.rpc || typeof _conn.rpc.call !== 'function') {
+    return Promise.reject(new Error('connection 服务不可用(插件未初始化)'))
+  }
+  return _conn.rpc.call('/api', 'token-usage/' + method, args === undefined ? null : args)
+    .then((res) => {
+      if (res && res.ok === true) return res.data
+      if (res && res.ok === false) throw new Error((res.error && res.error.message) || 'RPC 调用失败')
+      return res
+    })
+}
+
 // 全局开关状态(模块级, 两个入口共享)
 let panelOpen = false
 const listeners = new Set()
@@ -196,8 +212,8 @@ function Panel() {
     if (!open) return
     let cancel = false
     setLoading(true); setErr('')
-    host.call('token-usage.scan', {})
-      .then(() => (cancel ? null : host.call('token-usage.query', {})))
+    rpcCall('scan', {})
+      .then(() => (cancel ? null : rpcCall('query', {})))
       .then((d) => {
         if (cancel) return
         setData(d)
@@ -227,14 +243,14 @@ function Panel() {
 
   const runQuery = useCallback(() => {
     setLoading(true); setErr('')
-    host.call('token-usage.query', buildQ(true))
+    rpcCall('query', buildQ(true))
       .then((d) => { setData(d); setPage(0) })
       .catch((e) => setErr(String((e && e.message) || e)))
       .finally(() => setLoading(false))
   }, [buildQ])
 
   const exportCsv = useCallback(() => {
-    host.call('token-usage.export', buildQ(false))
+    rpcCall('export', buildQ(false))
       .then((d) => {
         const blob = new Blob([d.csv], { type: 'text/csv;charset=utf-8' })
         const url = URL.createObjectURL(blob)
@@ -419,6 +435,10 @@ function Panel() {
 
 export function apply(ctx) {
   if (typeof styles !== 'undefined' && styles.insert) styles.insert(css)
+  // 从 connection 服务初始化 RPC 桥接(静态插件无 host 全局)
+  _conn = ctx.get('connection') || null
   ctx.slots.register({ name: 'sidebar.footer.action', id: 'token-usage-launcher', order: 10, label: 'Token 用量' }, Launcher)
   ctx.slots.register({ name: 'shell.overlay', id: 'token-usage-panel', order: 10 }, Panel)
 }
+
+export const inject = ['slots', 'connection']

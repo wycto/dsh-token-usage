@@ -24,11 +24,23 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var index_exports = {};
 __export(index_exports, {
-  apply: () => apply
+  apply: () => apply,
+  inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
 var import_jsx_runtime = require("react/jsx-runtime");
 var import_react = require("react");
+let _conn = null;
+function rpcCall(method, args) {
+  if (!_conn || !_conn.rpc || typeof _conn.rpc.call !== "function") {
+    return Promise.reject(new Error("connection \u670D\u52A1\u4E0D\u53EF\u7528(\u63D2\u4EF6\u672A\u521D\u59CB\u5316)"));
+  }
+  return _conn.rpc.call("/api", "token-usage/" + method, args === void 0 ? null : args).then((res) => {
+    if (res && res.ok === true) return res.data;
+    if (res && res.ok === false) throw new Error(res.error && res.error.message || "RPC \u8C03\u7528\u5931\u8D25");
+    return res;
+  });
+}
 let panelOpen = false;
 const listeners = /* @__PURE__ */ new Set();
 function setPanelOpen(v) {
@@ -201,7 +213,7 @@ function Panel() {
     let cancel = false;
     setLoading(true);
     setErr("");
-    host.call("token-usage.scan", {}).then(() => cancel ? null : host.call("token-usage.query", {})).then((d) => {
+    rpcCall("scan", {}).then(() => cancel ? null : rpcCall("query", {})).then((d) => {
       if (cancel) return;
       setData(d);
       if (!fromStr && !toStr) {
@@ -233,13 +245,13 @@ function Panel() {
   const runQuery = (0, import_react.useCallback)(() => {
     setLoading(true);
     setErr("");
-    host.call("token-usage.query", buildQ(true)).then((d) => {
+    rpcCall("query", buildQ(true)).then((d) => {
       setData(d);
       setPage(0);
     }).catch((e) => setErr(String(e && e.message || e))).finally(() => setLoading(false));
   }, [buildQ]);
   const exportCsv = (0, import_react.useCallback)(() => {
-    host.call("token-usage.export", buildQ(false)).then((d) => {
+    rpcCall("export", buildQ(false)).then((d) => {
       const blob = new Blob([d.csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -451,9 +463,11 @@ function Panel() {
 }
 function apply(ctx) {
   if (typeof styles !== "undefined" && styles.insert) styles.insert(css);
+  _conn = ctx.get("connection") || null;
   ctx.slots.register({ name: "sidebar.footer.action", id: "token-usage-launcher", order: 10, label: "Token \u7528\u91CF" }, Launcher);
   ctx.slots.register({ name: "shell.overlay", id: "token-usage-panel", order: 10 }, Panel);
 }
+const inject = ["slots", "connection"];
 
 
 		return module.exports;
