@@ -13,7 +13,7 @@
  * 注意: 这是源码, 发布时用 tsdown 打包为 exports["./client"] 的 closure-factory。
  * (动态 extensions 场景直接作为 client half 运行, 用 React.createElement + 全局 React/styles/host。)
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 // ---------- Host RPC 桥接(静态插件) ----------
 // dsh rc.6 静态插件没有 host 全局; Host↔Client 走 webServer HTTP 路由:
@@ -119,12 +119,14 @@ const css = `
 .tokuse-table td { padding: 7px 10px; border-bottom: 1px solid rgba(122,132,152,0.12); }
 .tokuse-table tr:hover td { background: rgba(80,110,180,0.12); }
 .tokuse-empty { text-align: center; color: var(--tokuse-dim, #9aa3b5); padding: 40px 0; font-size: 13px; }
-.tokuse-layer { position: relative; display: inline-flex; flex: none; min-width: 0; }
-.tokuse-anchor { width: 0; height: 0; }
-.tokuse-footerActions { display: inline-flex; align-items: center; }
+.tokuse-layer { position: relative; display: inline-flex; flex: none; min-width: 0; align-items: center; }
 .tokuse-badge { box-sizing: border-box; cursor: pointer; height: 34px; color: var(--dsw-alias-label-primary, #e8eaf0); background: transparent; border: none; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; font-family: inherit; font-size: 14px; line-height: 22px; min-width: 0; white-space: nowrap; overflow: hidden; }
 .tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.08)); }
 .tokuse-badgeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 侧栏底部并排: 设置在左, footer actions(含 Token 用量)在右 */
+[class*="footArea"] { flex-direction: row !important; align-items: center; justify-content: center; gap: 4px; }
+[class*="settingsArea"] { order: 0; flex: 0 0 auto; width: auto !important; min-width: 0; }
+[class*="footerActions"] { order: 1; flex: 0 0 auto; width: auto !important; min-width: 0; justify-content: flex-start; }
 .tokuse-status { font-size: 12px; color: #7ab8ff; }
 .tokuse-sid { color: #7ab8ff; cursor: pointer; text-decoration: underline dotted; }
 .tokuse-sid:hover { color: #b8dcff; }
@@ -147,42 +149,13 @@ const css = `
 function Launcher(props) {
   const open = usePanelOpen()
   const wide = !!(props && props.wide)
-  const [pos, setPos] = useState(null)
-  const anchorRef = useRef(null)
-  useEffect(() => {
-    // 测量侧栏 footer 锚点, 把入口按钮固定定位到设置按钮右侧
-    const measure = () => {
-      const el = anchorRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      // 侧栏底部: footerActions 上方, settingsArea 在下方约 44px
-      setPos({ left: r.left, right: r.right, bottom: r.bottom })
-    }
-    measure()
-    // 侧栏展开/收起/窗口变化时重新测量
-    const onResize = () => setTimeout(measure, 60)
-    window.addEventListener('resize', onResize)
-    const iv = setInterval(measure, 800)
-    return () => { window.removeEventListener('resize', onResize); clearInterval(iv) }
-  }, [wide])
-
-  const style = pos ? {
-    position: 'fixed',
-    left: (pos.right - (wide ? 150 : 44)),
-    top: (pos.bottom + 4),
-    zIndex: 9500,
-  } : {}
-
   return (
     <div className="tokuse-layer">
-      <div ref={anchorRef} className="tokuse-anchor" />
       {open ? <Panel /> : null}
-      <div className="tokuse-footerActions" style={style}>
-        <button type="button" className="tokuse-badge" aria-label="Token 用量统计" aria-expanded={open} title="Token 用量统计" onClick={(e) => { e.stopPropagation(); setPanelOpen(!open) }}>
-          <span style={{ fontSize: 16, lineHeight: 1 }}>⛃</span>
-          {wide ? <span className="tokuse-badgeLabel">Token 用量</span> : null}
-        </button>
-      </div>
+      <button type="button" className="tokuse-badge" aria-label="Token 用量统计" aria-expanded={open} title="Token 用量统计" onClick={(e) => { e.stopPropagation(); setPanelOpen(!open) }}>
+        <span style={{ fontSize: 16, lineHeight: 1 }}>⛃</span>
+        {wide ? <span className="tokuse-badgeLabel">Token 用量</span> : null}
+      </button>
     </div>
   )
 }
