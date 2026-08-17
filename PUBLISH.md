@@ -1,4 +1,4 @@
-# 发布 / 分享打包指南
+﻿# 发布 / 分享打包指南
 
 > 依据官方文档（`docs/user/develop/basic/publish.md` 等）与社区实践整理。
 
@@ -19,7 +19,7 @@
 - **包名**用 npm scope 隔离：`@<作者或组织>/dsh-token-usage`。scope 是发布者身份，npm 全局唯一。
 - **插件行 id** 与包名保持一致（带 `@scope/` 前缀）。源码证据：`cordis-plugin-loader.update()`
   对两条相同 id 的行直接抛 `duplicate loader entry id`，导致启动失败——所以 id 必须带作者前缀避免撞车。
-- 当前文件用占位 `@yourname/`，发布前替换成你的真实 npm scope/用户名。
+- 当前文件用占位 `@wycto/`，发布前替换成你的真实 npm scope/用户名。
 
 ---
 
@@ -42,10 +42,10 @@ pnpm dsh web --patch ./scratch-plugin/cordis.yml
 ## 2. 打包为可分发 bundle
 
 ```
-@yourname/dsh-token-usage/           # npm 包(带 scope)
+@wycto/dsh-token-usage/           # npm 包(带 scope)
 ├── package.json
 │   # {
-│   #   "name": "@yourname/dsh-token-usage",
+│   #   "name": "@wycto/dsh-token-usage",
 │   #   "publishConfig": { "access": "public" },
 │   #   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
 │   #   "main": "lib/index.js"
@@ -64,7 +64,7 @@ pnpm dsh web --patch ./scratch-plugin/cordis.yml
 
 | 分发方式 | 作者操作 | 用户操作 |
 |---|---|---|
-| **npm** | `pnpm build && pnpm publish` | `dsh plugin --profile demo add @yourname/dsh-token-usage` |
+| **npm** | `pnpm build && pnpm publish` | `dsh plugin --profile demo add @wycto/dsh-token-usage` |
 | **tarball** | `pnpm pack` → `xxx.tgz` | `dsh plugin --profile demo add ./xxx.tgz` |
 | **git** | push + 提供 `prepare` 脚本 | `dsh plugin --profile demo add github:you/repo#<sha>`（需在 profile 的 `pnpm-workspace.yaml` 对该包 `allowBuilds: true`） |
 
@@ -75,9 +75,9 @@ pnpm dsh web --patch ./scratch-plugin/cordis.yml
 把 `cordis_define` 里两份代码（host 逻辑 + client UI 逻辑）保存为：
 
 ```
-@yourname/dsh-token-usage/
-├── package.json          # name: @yourname/dsh-token-usage; dsh.bundle.patch
-├── cordis.patch.yml      # - insert: - id: '@yourname/dsh-token-usage', name: '@yourname/dsh-token-usage'
+@wycto/dsh-token-usage/
+├── package.json          # name: @wycto/dsh-token-usage; dsh.bundle.patch
+├── cordis.patch.yml      # - insert: - id: '@wycto/dsh-token-usage', name: '@wycto/dsh-token-usage'
 ├── lib/index.js          # Host: return { name, apply(ctx){ ... } }
 └── client.js             # Client(web): 编译产物, package.json exports["./client"]
 ```

@@ -1,4 +1,4 @@
-# dsh-token-usage — DSH Token 用量记录与统计插件
+﻿# dsh-token-usage — DSH Token 用量记录与统计插件
 
 记录 DeepSeek Harness 中所有 LLM API 调用（模型请求），提供单窗口全屏统计面板。
 支持秒级时间范围查询、多维度筛选、会话 ID 筛选、排序、状态码与调用详情、分组统计表与 CSV 导出。
@@ -52,15 +52,15 @@
 ## 安装（开发体验）
 
 1. 将 `lib/index.js`（Host）与 `client/index.js`（Client web）放入 `src/`。
-2. `cordis.patch.yml` 插入插件行（`name`/`id` 用带 scope 的包名 `@yourname/dsh-token-usage`）。
+2. `cordis.patch.yml` 插入插件行（`name`/`id` 用带 scope 的包名 `@wycto/dsh-token-usage`）。
 3. `pnpm dsh web --patch ./dsh-token-usage/cordis.patch.yml`
 
 ## 发布
 
 详见 [`PUBLISH.md`](./PUBLISH.md)：打包为带 `dsh.bundle` manifest 的 npm 组合包，
-用户 `dsh plugin --profile <name> add @yourname/dsh-token-usage` 安装。
+用户 `dsh plugin --profile <name> add @wycto/dsh-token-usage` 安装。
 
-> 发布前把 `@yourname/` 替换成你的真实 npm scope（见 PUBLISH.md §0 命名规范，避免与
+> 发布前把 `@wycto/` 替换成你的真实 npm scope（见 PUBLISH.md §0 命名规范，避免与
 > 他人同功能插件 id 冲突导致启动失败）。
 
 ## 安全

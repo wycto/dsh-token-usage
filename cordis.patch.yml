@@ -1,3 +1,3 @@
-- insert:
-    - id: '@yourname/dsh-token-usage'
-      name: '@yourname/dsh-token-usage'
+﻿- insert:
+    - id: '@wycto/dsh-token-usage'
+      name: '@wycto/dsh-token-usage'
