@@ -16,18 +16,19 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 
 // ---------- Host RPC 桥接(静态插件) ----------
-// dsh rc.6 静态插件没有 host 全局; 通过 ctx.connection.rpc.call 调用 Host。
-// apply(ctx) 里从 ctx.connection 初始化, 组件内统一用 rpcCall(method, args)。
-let _conn = null
+// dsh rc.6 静态插件没有 host 全局; Host↔Client 走 webServer HTTP 路由:
+//   host 注册 /tokuse/* 前缀路由, client 用 fetch 调用(同源, 无需 CORS)。
 function rpcCall(method, args) {
-  if (!_conn || !_conn.rpc || typeof _conn.rpc.call !== 'function') {
-    return Promise.reject(new Error('connection 服务不可用(插件未初始化)'))
-  }
-  return _conn.rpc.call('/api', 'token-usage/' + method, args === undefined ? null : args)
-    .then((res) => {
-      if (res && res.ok === true) return res.data
-      if (res && res.ok === false) throw new Error((res.error && res.error.message) || 'RPC 调用失败')
-      return res
+  return fetch('/tokuse/' + method, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(args === undefined ? {} : args),
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data && data.ok === true) return data.data
+      if (data && data.ok === false) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status))
+      throw new Error('HTTP ' + res.status + (data && data.error && data.error.message ? ': ' + data.error.message : ''))
     })
 }
 
@@ -118,10 +119,10 @@ const css = `
 .tokuse-table td { padding: 7px 10px; border-bottom: 1px solid rgba(122,132,152,0.12); }
 .tokuse-table tr:hover td { background: rgba(80,110,180,0.12); }
 .tokuse-empty { text-align: center; color: var(--tokuse-dim, #9aa3b5); padding: 40px 0; font-size: 13px; }
-.tokuse-layer { position: relative; }
-.tokuse-footerActions { display: flex; align-items: center; gap: 4px; padding: 4px; }
-.tokuse-badge { cursor: pointer; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary, #9aa3b5); display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; line-height: 18px; min-width: 0; white-space: nowrap; }
-.tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,0.06)); color: var(--dsw-alias-label-primary, #e8eaf0); }
+.tokuse-layer { position: relative; display: inline-flex; flex: none; min-width: 0; }
+.tokuse-footerActions { display: inline-flex; align-items: center; }
+.tokuse-badge { cursor: pointer; height: 28px; color: var(--dsw-alias-label-secondary, #9aa3b5); background: transparent; border: none; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; font-size: 12px; line-height: 18px; min-width: 0; white-space: nowrap; }
+.tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.08)); color: var(--dsw-alias-label-primary, #e8eaf0); }
 .tokuse-badgeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tokuse-status { font-size: 12px; color: #7ab8ff; }
 .tokuse-sid { color: #7ab8ff; cursor: pointer; text-decoration: underline dotted; }
@@ -444,8 +445,6 @@ function Panel() {
 
 export function apply(ctx) {
   if (typeof styles !== 'undefined' && styles.insert) styles.insert(css)
-  // 从 connection 服务初始化 RPC 桥接(静态插件无 host 全局)
-  _conn = ctx.get('connection') || null
   const slots = ctx.get('slots')
   if (!slots) return
   // 自包含组件: 入口按钮 + 面板浮层, 注册在 设置旁边 的 additive action slot
@@ -455,4 +454,4 @@ export function apply(ctx) {
   ))
 }
 
-export const inject = ['slots', 'connection']
+export const inject = ['slots']
