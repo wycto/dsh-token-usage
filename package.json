@@ -1,6 +1,6 @@
 {
   "name": "@wycto/dsh-token-usage",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Token 用量记录与统计面板：记录 DSH 所有 LLM API 调用，支持秒级时间范围查询、多维度筛选、分组统计与 CSV 导出",
   "type": "module",
   "main": "lib/index.js",
