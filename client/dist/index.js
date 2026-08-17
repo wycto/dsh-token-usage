@@ -484,6 +484,8 @@ function apply(ctx) {
 const inject = ["slots", "connection"];
 
 
+		exports.apply = apply;
+		exports.inject = inject;
 		return module.exports;
 	}
 });

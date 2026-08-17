@@ -59,6 +59,8 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 `;
 const footer = `
+		exports.apply = apply;
+		exports.inject = inject;
 		return module.exports;
 	}
 });
