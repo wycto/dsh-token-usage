@@ -1,4 +1,4 @@
-﻿# dsh-token-usage — DSH Token 用量记录与统计插件
+# dsh-token-usage — DSH Token 用量记录与统计插件
 
 记录 DeepSeek Harness 中所有 LLM API 调用（模型请求），提供单窗口全屏统计面板。
 支持秒级时间范围查询、多维度筛选、会话 ID 筛选、排序、状态码与调用详情、分组统计表与 CSV 导出。
@@ -49,19 +49,39 @@
 | 会话 ID | 事件所属 session id | 可点击筛选、详情展示 |
 | 耗时 | `step/start → assistant/message` | llmMs |
 
-## 安装（开发体验）
+## 安装
+
+### 方式一：npm 包（推荐，已发布）
+
+```bash
+dsh plugin --profile <profile名> add @wycto/dsh-token-usage
+```
+
+安装后重启 DSH（`dsh --profile <profile名>`），侧边栏底部出现蓝色"Token 用量"按钮。
+
+### 方式二：本地开发体验
 
 1. 将 `lib/index.js`（Host）与 `client/index.js`（Client web）放入 `src/`。
 2. `cordis.patch.yml` 插入插件行（`name`/`id` 用带 scope 的包名 `@wycto/dsh-token-usage`）。
 3. `pnpm dsh web --patch ./dsh-token-usage/cordis.patch.yml`
 
-## 发布
+## 发布与更新
 
-详见 [`PUBLISH.md`](./PUBLISH.md)：打包为带 `dsh.bundle` manifest 的 npm 组合包，
-用户 `dsh plugin --profile <name> add @wycto/dsh-token-usage` 安装。
+详见 [`PUBLISH.md`](./PUBLISH.md)：打包为带 `dsh.bundle` manifest 的 npm 组合包。
 
-> 发布前把 `@wycto/` 替换成你的真实 npm scope（见 PUBLISH.md §0 命名规范，避免与
-> 他人同功能插件 id 冲突导致启动失败）。
+| 操作 | 命令 |
+|---|---|
+| 登录 npm | `npm adduser` |
+| 首次发布 | `npm publish` |
+| 升小版本（0.1.0 → 0.1.1，修复） | `npm version patch && npm publish` |
+| 升中版本（0.1.1 → 0.2.0，新功能） | `npm version minor && npm publish` |
+| 升大版本（0.2.0 → 1.0.0） | `npm version major && npm publish` |
+
+> `npm version` 会自动修改 `package.json` 版本号并打 git tag（如 `v0.1.0`），
+> 推送 tag 用 `git push --tags`。包名 scope `@wycto/` 与 npm 账号一致，可直接发布。
+
+- npm 包主页：<https://www.npmjs.com/package/@wycto/dsh-token-usage>
+- 源码仓库：<https://github.com/wycto/dsh-token-usage>
 
 ## 安全
 
