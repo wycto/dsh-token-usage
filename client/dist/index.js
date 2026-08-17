@@ -132,9 +132,10 @@ const css = `
 .tokuse-table tr:hover td { background: rgba(80,110,180,0.12); }
 .tokuse-empty { text-align: center; color: var(--tokuse-dim, #9aa3b5); padding: 40px 0; font-size: 13px; }
 .tokuse-layer { position: relative; display: inline-flex; flex: none; min-width: 0; }
+.tokuse-anchor { width: 0; height: 0; }
 .tokuse-footerActions { display: inline-flex; align-items: center; }
-.tokuse-badge { cursor: pointer; height: 28px; color: var(--dsw-alias-label-secondary, #9aa3b5); background: transparent; border: none; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; font-size: 12px; line-height: 18px; min-width: 0; white-space: nowrap; }
-.tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.08)); color: var(--dsw-alias-label-primary, #e8eaf0); }
+.tokuse-badge { box-sizing: border-box; cursor: pointer; height: 34px; color: var(--dsw-alias-label-primary, #e8eaf0); background: transparent; border: none; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; font-family: inherit; font-size: 14px; line-height: 22px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.tokuse-badge:hover, .tokuse-badge:focus-visible { background: var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.08)); }
 .tokuse-badgeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tokuse-status { font-size: 12px; color: #7ab8ff; }
 .tokuse-sid { color: #7ab8ff; cursor: pointer; text-decoration: underline dotted; }
@@ -157,12 +158,37 @@ const css = `
 function Launcher(props) {
   const open = usePanelOpen();
   const wide = !!(props && props.wide);
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-layer", onClick: (e) => {
-    e.stopPropagation();
-    setPanelOpen(!open);
-  }, children: [
+  const [pos, setPos] = (0, import_react.useState)(null);
+  const anchorRef = (0, import_react.useRef)(null);
+  (0, import_react.useEffect)(() => {
+    const measure = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ left: r.left, right: r.right, bottom: r.bottom });
+    };
+    measure();
+    const onResize = () => setTimeout(measure, 60);
+    window.addEventListener("resize", onResize);
+    const iv = setInterval(measure, 800);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      clearInterval(iv);
+    };
+  }, [wide]);
+  const style = pos ? {
+    position: "fixed",
+    left: pos.right - (wide ? 150 : 44),
+    top: pos.bottom + 4,
+    zIndex: 9500
+  } : {};
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-layer", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { ref: anchorRef, className: "tokuse-anchor" }),
     open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {}) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-footerActions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "tokuse-badge", "aria-label": "Token \u7528\u91CF\u7EDF\u8BA1", "aria-expanded": open, title: "Token \u7528\u91CF\u7EDF\u8BA1", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-footerActions", style, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "tokuse-badge", "aria-label": "Token \u7528\u91CF\u7EDF\u8BA1", "aria-expanded": open, title: "Token \u7528\u91CF\u7EDF\u8BA1", onClick: (e) => {
+      e.stopPropagation();
+      setPanelOpen(!open);
+    }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u26C3" }),
       wide ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-badgeLabel", children: "Token \u7528\u91CF" }) : null
     ] }) })
