@@ -11,6 +11,8 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+# 本项目 client 构建产物需要随包提交/发布, 取消忽略
+!client/dist/
 downloads/
 eggs/
 .eggs/

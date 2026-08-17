@@ -26,8 +26,8 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "build": "echo \"host: plain ESM, nothing to build; client: run tsdown build\" && tsdown --config client/tsdown.config.ts",
-    "pack": "pnpm pack"
+    "build": "node client/build.mjs",
+    "pack": "npm pack"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": "*"
