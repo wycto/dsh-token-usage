@@ -57,6 +57,24 @@ function usePanelOpen() {
   }, []);
   return open;
 }
+const PLUGIN_ID = "@wycto/dsh-token-usage";
+const CSS_TAG_ID = PLUGIN_ID + "/panel.css";
+function insertCss(cssText) {
+  if (typeof styles !== "undefined" && styles && typeof styles.insert === "function") {
+    return styles.insert(cssText);
+  }
+  if (typeof document !== "undefined") {
+    if (!document.querySelector("style[data-plugin-css=" + JSON.stringify(CSS_TAG_ID) + "]")) {
+      const tag = document.createElement("style");
+      tag.dataset.plugin = PLUGIN_ID;
+      tag.dataset.pluginCss = CSS_TAG_ID;
+      tag.textContent = cssText;
+      document.head.appendChild(tag);
+    }
+  }
+  return () => {
+  };
+}
 function fmtNum(n) {
   return (Number(n) || 0).toLocaleString("en-US");
 }
@@ -72,6 +90,12 @@ function fmtCost(n) {
   if (v >= 10) return "$" + v.toFixed(2);
   if (v >= 0.01) return "$" + v.toFixed(4);
   return "$" + v.toFixed(6);
+}
+function fmtCostCny(usd, rate) {
+  const v = (Number(usd) || 0) * (Number(rate) > 0 ? Number(rate) : 7.2);
+  if (v >= 1e4) return "\xA5" + (v / 1e4).toFixed(2) + "\u4E07";
+  if (v >= 100) return "\xA5" + v.toFixed(0);
+  return "\xA5" + v.toFixed(2);
 }
 function fmtDuration(ms) {
   if (ms === null || ms === void 0 || isNaN(ms)) return "\u2014";
@@ -90,6 +114,12 @@ function toLocalInput(ts) {
   const d = new Date(ts);
   const p = (x) => String(x).padStart(2, "0");
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+}
+function defaultRange() {
+  const now = /* @__PURE__ */ new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return { from: toLocalInput(start.getTime()), to: toLocalInput(end.getTime()) };
 }
 function shortId(sid) {
   if (!sid) return "";
@@ -156,23 +186,37 @@ const css = `
 .tokuse-detail-row .k { color: var(--tokuse-dim, #9aa3b5); min-width: 110px; flex-shrink: 0; }
 .tokuse-detail-row .v { word-break: break-all; }
 .tokuse-sort-mark { opacity: 0.6; margin-left: 3px; }
+.tokuse-pager { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--tokuse-dim, #9aa3b5); }
+.tokuse-pager.top { margin: 2px 0 8px; }
+.tokuse-pager.bottom { margin: 10px 0 0; }
+/* \u534A\u5C4F\u6A21\u5F0F: \u53EA\u5360\u4E0A\u534A\u5C4F, \u4E0B\u534A\u5C4F\u53EF\u7EE7\u7EED\u5DE5\u4F5C */
+.tokuse-overlay.half { top: 0; bottom: auto; height: 50vh; }
+/* \u6298\u53E0\u540E\u7684\u60AC\u6D6E\u6761(\u53F3\u4E0A\u89D2), \u70B9\u51FB\u5C55\u5F00 */
+.tokuse-minibar { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--tokuse-header, rgba(20,23,30,0.97)); border: 1px solid var(--tokuse-border, #3a4150); color: var(--tokuse-fg, #e8eaf0); font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+.tokuse-minibar:hover { background: #2c3342; }
+.tokuse-minibar .lbl { color: var(--tokuse-dim, #9aa3b5); }
+/* \u4EBA\u6C11\u5E01\u91D1\u989D\u5C0F\u5B57 */
+.tokuse-cny { font-size: 11px; color: var(--tokuse-dim, #9aa3b5); }
 `;
 function Launcher(props) {
   const open = usePanelOpen();
   const wide = !!(props && props.wide);
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-layer", children: [
-    open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {}) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "tokuse-badge", "aria-label": "Token \u7528\u91CF\u7EDF\u8BA1", "aria-expanded": open, title: "Token \u7528\u91CF\u7EDF\u8BA1", onClick: (e) => {
-      e.stopPropagation();
-      setPanelOpen(!open);
-    }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u26C3" }),
-      wide ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-badgeLabel", children: "Token \u7528\u91CF" }) : null
-    ] })
-  ] });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-layer", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "tokuse-badge", "aria-label": "Token \u7528\u91CF\u7EDF\u8BA1", "aria-expanded": open, title: "Token \u7528\u91CF\u7EDF\u8BA1", onClick: (e) => {
+    e.stopPropagation();
+    setPanelOpen(!open);
+  }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 16, lineHeight: 1 }, children: "\u26C3" }),
+    wide ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-badgeLabel", children: "Token \u7528\u91CF" }) : null
+  ] }) });
 }
-function Detail({ rec, onClose }) {
+function Overlay() {
+  const open = usePanelOpen();
+  if (!open) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {});
+}
+function Detail({ rec, onClose, rate }) {
   const st = statusInfo(rec);
+  const rateCny = Number(rate) > 0 ? Number(rate) : 7.2;
   const rows = [
     ["\u4F1A\u8BDD ID", rec.sessionId],
     ["\u65F6\u95F4", fmtTime(rec.time)],
@@ -190,7 +234,7 @@ function Detail({ rec, onClose }) {
     ["\u8BA1\u8D39\u8F93\u5165", fmtNum(rec.billedInput)],
     ["\u7F13\u5B58\u547D\u4E2D\u7387", rec.cacheHitPercent + "%"],
     ["\u603B Token", fmtNum(rec.totalTokens)],
-    ["\u6D88\u8017\u91D1\u989D(\u4F30\u7B97)", fmtCost(rec.cost)],
+    ["\u6D88\u8017\u91D1\u989D(\u4F30\u7B97)", fmtCost(rec.cost) + " \u2248 " + fmtCostCny(rec.cost, rateCny)],
     ["\u63A8\u7406\u5F3A\u5EA6", rec.effort || "\u2014"],
     ["\u8017\u65F6", fmtDuration(rec.llmMs)],
     ["Turn / Step", rec.turn + " / " + rec.step]
@@ -206,8 +250,8 @@ function Detail({ rec, onClose }) {
 }
 function Panel() {
   const open = usePanelOpen();
-  const [fromStr, setFromStr] = (0, import_react.useState)("");
-  const [toStr, setToStr] = (0, import_react.useState)("");
+  const [fromStr, setFromStr] = (0, import_react.useState)(() => defaultRange().from);
+  const [toStr, setToStr] = (0, import_react.useState)(() => defaultRange().to);
   const [provider, setProvider] = (0, import_react.useState)("");
   const [model, setModel] = (0, import_react.useState)("");
   const [status, setStatus] = (0, import_react.useState)("");
@@ -221,20 +265,22 @@ function Panel() {
   const [err, setErr] = (0, import_react.useState)("");
   const [page, setPage] = (0, import_react.useState)(0);
   const [detailRec, setDetailRec] = (0, import_react.useState)(null);
+  const [mode, setMode] = (0, import_react.useState)("full");
+  const prevModeRef = (0, import_react.useRef)("full");
+  const changeMode = (0, import_react.useCallback)((m) => {
+    if (m !== "collapsed") prevModeRef.current = m;
+    setMode(m);
+  }, []);
   const pageSize = 100;
   (0, import_react.useEffect)(() => {
     if (!open) return;
     let cancel = false;
     setLoading(true);
     setErr("");
-    rpcCall("scan", {}).then(() => cancel ? null : rpcCall("query", {})).then((d) => {
+    const r0 = defaultRange();
+    rpcCall("scan", {}).then(() => cancel ? null : rpcCall("query", { from: new Date(r0.from).getTime(), to: new Date(r0.to).getTime() })).then((d) => {
       if (cancel) return;
       setData(d);
-      if (!fromStr && !toStr) {
-        const now = Date.now();
-        setFromStr(toLocalInput(now - 30 * 864e5));
-        setToStr(toLocalInput(now + 864e5));
-      }
     }).catch((e) => {
       if (!cancel) setErr(String(e && e.message || e));
     }).finally(() => {
@@ -264,6 +310,23 @@ function Panel() {
       setPage(0);
     }).catch((e) => setErr(String(e && e.message || e))).finally(() => setLoading(false));
   }, [buildQ]);
+  const resetFilters = (0, import_react.useCallback)(() => {
+    const r = defaultRange();
+    setFromStr(r.from);
+    setToStr(r.to);
+    setProvider("");
+    setModel("");
+    setStatus("");
+    setEffort("");
+    setSessionId("");
+    setDim("");
+    setLoading(true);
+    setErr("");
+    rpcCall("query", { from: new Date(r.from).getTime(), to: new Date(r.to).getTime() }).then((d) => {
+      setData(d);
+      setPage(0);
+    }).catch((e) => setErr(String(e && e.message || e))).finally(() => setLoading(false));
+  }, []);
   const exportCsv = (0, import_react.useCallback)(() => {
     rpcCall("export", buildQ(false)).then((d) => {
       const blob = new Blob([d.csv], { type: "text/csv;charset=utf-8" });
@@ -275,6 +338,17 @@ function Panel() {
       URL.revokeObjectURL(url);
     }).catch((e) => setErr(String(e && e.message || e)));
   }, [buildQ]);
+  (0, import_react.useEffect)(() => {
+    if (!open) return;
+    const timer = setInterval(() => {
+      rpcCall("query", buildQ(true)).then((d) => {
+        setData(d);
+        setErr("");
+      }).catch(() => {
+      });
+    }, 5e3);
+    return () => clearInterval(timer);
+  }, [open, buildQ]);
   const toggleSort = (0, import_react.useCallback)((key) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else {
@@ -303,6 +377,7 @@ function Panel() {
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageSafe = Math.min(page, pageCount - 1);
   const pageRows = sorted.slice(pageSafe * pageSize, (pageSafe + 1) * pageSize);
+  const rateCny = data && data.rateUsdCny || 7.2;
   const cards = totals ? [
     { v: fmtNum(totals.calls), l: "\u8C03\u7528\u6B21\u6570" },
     { v: fmtCompact(totals.totalTokens), l: "\u603B Token" },
@@ -311,9 +386,11 @@ function Panel() {
     { v: totals.cacheHitPct + "%", l: "\u7F13\u5B58\u547D\u4E2D\u7387" },
     { v: fmtCompact(totals.outputTokens), l: "\u8F93\u51FA" },
     { v: fmtCost(totals.cost), l: "\u6D88\u8017\u91D1\u989D(\u4F30\u7B97)" },
+    { v: fmtCostCny(totals.cost, rateCny), l: "\u6D88\u8017\u91D1\u989D(\xA5)" },
     { v: fmtDuration(totals.llmMs), l: "\u7D2F\u8BA1\u8017\u65F6" + (totals.timed ? " (" + totals.timed + "\u6B65)" : "") }
   ] : [];
   const opts = (arr) => (arr || []).map((x) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: x, children: x || "(\u7A7A)" }, x || "(none)"));
+  const modelChoices = provider && data && data.modelsByProvider ? data.modelsByProvider[provider] || [] : data && data.models || [];
   const summaryRows = (data && data.summary || []).map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: r.key }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.calls) }),
@@ -322,7 +399,10 @@ function Panel() {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: r.cacheHitPct + "%" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCompact(r.outputTokens) }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCompact(r.totalTokens) }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCost(r.cost) }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: fmtCost(r.cost) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-cny", children: fmtCostCny(r.cost, rateCny) })
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtDuration(r.llmMs) })
   ] }, r.key));
   const sortTh = (label, key) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("th", { onClick: () => toggleSort(key), title: "\u70B9\u51FB\u6392\u5E8F", children: [
@@ -345,7 +425,10 @@ function Panel() {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.outputTokens) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.reasoningTokens) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.totalTokens) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCost(r.cost) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: fmtCost(r.cost) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-cny", children: fmtCostCny(r.cost, rateCny) })
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: r.effort || "\u2014" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-code " + st.cls, children: st.label }) }),
@@ -399,6 +482,20 @@ function Panel() {
   if (sorted.length === 0) {
     bodyNodes.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-empty", children: loading ? "\u52A0\u8F7D\u4E2D\u2026" : "\u65E0\u5339\u914D\u8BB0\u5F55" }, "empty"));
   } else {
+    const pager = (key, cls) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-pager " + cls, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", disabled: pageSafe <= 0, onClick: () => setPage(pageSafe - 1), children: "\u4E0A\u4E00\u9875" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+        "\u7B2C ",
+        pageSafe + 1,
+        " / ",
+        pageCount,
+        " \u9875 \xB7 \u5171 ",
+        sorted.length,
+        " \u6761"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", disabled: pageSafe >= pageCount - 1, onClick: () => setPage(pageSafe + 1), children: "\u4E0B\u4E00\u9875" })
+    ] }, key);
+    bodyNodes.push(pager("pager-top", "top"));
     bodyNodes.push(
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-table-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", { className: "tokuse-table", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
@@ -418,24 +515,29 @@ function Panel() {
           sortTh("\u8017\u65F6", "llmMs")
         ] }) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: detailRows })
-      ] }) }, "detail"),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 12, color: "var(--tokuse-dim, #9aa3b5)" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", disabled: pageSafe <= 0, onClick: () => setPage(pageSafe - 1), children: "\u4E0A\u4E00\u9875" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-          "\u7B2C ",
-          pageSafe + 1,
-          " / ",
-          pageCount,
-          " \u9875"
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", disabled: pageSafe >= pageCount - 1, onClick: () => setPage(pageSafe + 1), children: "\u4E0B\u4E00\u9875" })
-      ] }, "pager")
+      ] }) }, "detail")
     );
+    bodyNodes.push(pager("pager-bottom", "bottom"));
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-overlay", onClick: (e) => e.stopPropagation(), children: [
+  if (mode === "collapsed") {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-minibar", title: "\u5C55\u5F00 Token \u7528\u91CF\u9762\u677F", onClick: (e) => {
+      e.stopPropagation();
+      changeMode(prevModeRef.current);
+    }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u26C3" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+        "Token \u7528\u91CF",
+        loading ? " \u2026" : ""
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "lbl", children: "\u5C55\u5F00" })
+    ] });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-overlay" + (mode === "half" ? " half" : ""), onClick: (e) => e.stopPropagation(), children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-header", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-title", children: "Token \u7528\u91CF\u7EDF\u8BA1" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-status", children: loading ? "\u52A0\u8F7D\u4E2D\u2026" : data ? data.counts.matching + " / " + data.counts.total + " \u6761" : "" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-close", title: mode === "half" ? "\u5207\u6362\u5168\u5C4F" : "\u5207\u6362\u4E0A\u534A\u5C4F", onClick: () => changeMode(mode === "half" ? "full" : "half"), children: mode === "half" ? "\u2922 \u5168\u5C4F" : "\u2921 \u534A\u5C4F" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-close", title: "\u6298\u53E0\u4E3A\u60AC\u6D6E\u6761, \u7EE7\u7EED\u5DE5\u4F5C", onClick: () => changeMode("collapsed"), children: "\u2014 \u6536\u8D77" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-close", onClick: () => setPanelOpen(false), children: "\u2715 \u5173\u95ED" })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "tokuse-filter", children: [
@@ -449,14 +551,17 @@ function Panel() {
         opts(sessionIds)
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", { children: "\u63D0\u4F9B\u5546" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "tokuse-select", value: provider, onChange: (e) => setProvider(e.target.value), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "tokuse-select", value: provider, onChange: (e) => {
+        setProvider(e.target.value);
+        setModel("");
+      }, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u5168\u90E8" }),
         opts(data && data.providers)
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", { children: "\u6A21\u578B" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "tokuse-select", value: model, onChange: (e) => setModel(e.target.value), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u5168\u90E8" }),
-        opts(data && data.models)
+        opts(modelChoices)
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", { children: "\u72B6\u6001" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "tokuse-select", value: status, onChange: (e) => setStatus(e.target.value), children: [
@@ -469,19 +574,24 @@ function Panel() {
         opts(data && data.efforts)
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn primary", onClick: runQuery, children: "\u67E5\u8BE2" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", onClick: resetFilters, children: "\u91CD\u7F6E" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "tokuse-btn", onClick: exportCsv, children: "\u5BFC\u51FA CSV" })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-body", children: bodyNodes }),
-    detailRec ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Detail, { rec: detailRec, onClose: () => setDetailRec(null) }) : null
+    detailRec ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Detail, { rec: detailRec, onClose: () => setDetailRec(null), rate: rateCny }) : null
   ] });
 }
 function apply(ctx) {
-  if (typeof styles !== "undefined" && styles.insert) styles.insert(css);
+  insertCss(css);
   const slots = ctx.get("slots");
   if (!slots) return;
   slots.inject("sidebar.footer.action", () => slots.register(
     { name: "sidebar.footer.action", id: "token-usage", order: 10, label: "Token \u7528\u91CF" },
     Launcher
+  ));
+  slots.inject("shell.overlay", () => slots.register(
+    { name: "shell.overlay", id: "token-usage", order: 100, label: "Token \u7528\u91CF\u9762\u677F" },
+    Overlay
   ));
 }
 const inject = ["slots"];

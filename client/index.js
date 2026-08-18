@@ -1,19 +1,24 @@
 /**
- * dsh-token-usage — Client 端(web) v5
+ * dsh-token-usage — Client 端(web) v6
  *
  * 单窗口全屏统计面板:
  *  - sidebar.footer.action 入口按钮 "Token 用量"(醒目大按钮)
- *  - shell.overlay 全屏工作台(可开关)
+ *  - shell.overlay 全屏工作台(可开关, 注册在官方 frame-wide 浮层层, 全屏稳定)
  *  - 秒级时间范围查询 + 会话ID/provider/model/状态/推理强度 筛选
  *  - 明细表可点击表头排序, 会话ID可点击筛选
  *  - 状态列显示 HTTP 状态码(200/400/499/403/500…), 下方【查看详情】弹窗展示完整信息
  *  - 分组统计表 + CSV 导出
  *
- * 通过 host.call('token-usage.*') 调用 Host RPC。
- * 注意: 这是源码, 发布时用 tsdown 打包为 exports["./client"] 的 closure-factory。
- * (动态 extensions 场景直接作为 client half 运行, 用 React.createElement + 全局 React/styles/host。)
+ * 静态插件(npm 包, __ModuleLoader__ 加载)通过 /tokuse/* HTTP 路由调用 Host;
+ * 动态 Cordis 插件场景直接作为 client half 运行。
+ *
+ * CSS 注入兼容两种运行时:
+ *  - 动态插件: 内置全局 styles.insert(css)
+ *  - 静态插件: 运行时没有 styles 全局(seed 词表不含 styles), 退化为
+ *    document.createElement('style') + data-plugin 标记(与官方 client 包一致),
+ *    由 client-modules 的 claimStyles 认领做 HMR 记账。
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // ---------- Host RPC 桥接(静态插件) ----------
 // dsh rc.6 静态插件没有 host 全局; Host↔Client 走 webServer HTTP 路由:
@@ -46,6 +51,29 @@ function usePanelOpen() {
   return open
 }
 
+// ---------- CSS 注入(兼容动态/静态两种运行时) ----------
+// 动态 Cordis 插件: 内置全局 styles.insert(css), 由运行时随 Client run 清理。
+// 静态插件(npm 包): 没有 styles 全局(seed 词表不含 styles), 退化为 <style> 标签,
+//   带 data-plugin / data-plugin-css 标记(官方 client 包同款约定),
+//   供 client-modules claimStyles 按插件记账; 重复 materialize 时幂等跳过。
+const PLUGIN_ID = '@wycto/dsh-token-usage'
+const CSS_TAG_ID = PLUGIN_ID + '/panel.css'
+function insertCss(cssText) {
+  if (typeof styles !== 'undefined' && styles && typeof styles.insert === 'function') {
+    return styles.insert(cssText)
+  }
+  if (typeof document !== 'undefined') {
+    if (!document.querySelector('style[data-plugin-css=' + JSON.stringify(CSS_TAG_ID) + ']')) {
+      const tag = document.createElement('style')
+      tag.dataset.plugin = PLUGIN_ID
+      tag.dataset.pluginCss = CSS_TAG_ID
+      tag.textContent = cssText
+      document.head.appendChild(tag)
+    }
+  }
+  return () => {}
+}
+
 function fmtNum(n) { return (Number(n) || 0).toLocaleString('en-US') }
 function fmtCompact(n) {
   n = Number(n) || 0
@@ -59,6 +87,13 @@ function fmtCost(n) {
   if (v >= 10) return '$' + v.toFixed(2)
   if (v >= 0.01) return '$' + v.toFixed(4)
   return '$' + v.toFixed(6)
+}
+// 人民币金额: USD 按汇率换算, 默认 7.2(host 返回 rateUsdCny 可覆盖)
+function fmtCostCny(usd, rate) {
+  const v = (Number(usd) || 0) * (Number(rate) > 0 ? Number(rate) : 7.2)
+  if (v >= 10000) return '¥' + (v / 10000).toFixed(2) + '万'
+  if (v >= 100) return '¥' + v.toFixed(0)
+  return '¥' + v.toFixed(2)
 }
 function fmtDuration(ms) {
   if (ms === null || ms === undefined || isNaN(ms)) return '—'
@@ -77,6 +112,13 @@ function toLocalInput(ts) {
   const d = new Date(ts)
   const p = (x) => String(x).padStart(2, '0')
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds())
+}
+// 默认查询时间范围: 当天 00:00:00 ~ 23:59:59(不再默认"明天")
+function defaultRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+  return { from: toLocalInput(start.getTime()), to: toLocalInput(end.getTime()) }
 }
 function shortId(sid) {
   if (!sid) return ''
@@ -144,6 +186,17 @@ const css = `
 .tokuse-detail-row .k { color: var(--tokuse-dim, #9aa3b5); min-width: 110px; flex-shrink: 0; }
 .tokuse-detail-row .v { word-break: break-all; }
 .tokuse-sort-mark { opacity: 0.6; margin-left: 3px; }
+.tokuse-pager { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--tokuse-dim, #9aa3b5); }
+.tokuse-pager.top { margin: 2px 0 8px; }
+.tokuse-pager.bottom { margin: 10px 0 0; }
+/* 半屏模式: 只占上半屏, 下半屏可继续工作 */
+.tokuse-overlay.half { top: 0; bottom: auto; height: 50vh; }
+/* 折叠后的悬浮条(右上角), 点击展开 */
+.tokuse-minibar { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--tokuse-header, rgba(20,23,30,0.97)); border: 1px solid var(--tokuse-border, #3a4150); color: var(--tokuse-fg, #e8eaf0); font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+.tokuse-minibar:hover { background: #2c3342; }
+.tokuse-minibar .lbl { color: var(--tokuse-dim, #9aa3b5); }
+/* 人民币金额小字 */
+.tokuse-cny { font-size: 11px; color: var(--tokuse-dim, #9aa3b5); }
 `
 
 function Launcher(props) {
@@ -151,7 +204,6 @@ function Launcher(props) {
   const wide = !!(props && props.wide)
   return (
     <div className="tokuse-layer">
-      {open ? <Panel /> : null}
       <button type="button" className="tokuse-badge" aria-label="Token 用量统计" aria-expanded={open} title="Token 用量统计" onClick={(e) => { e.stopPropagation(); setPanelOpen(!open) }}>
         <span style={{ fontSize: 16, lineHeight: 1 }}>⛃</span>
         {wide ? <span className="tokuse-badgeLabel">Token 用量</span> : null}
@@ -160,8 +212,17 @@ function Launcher(props) {
   )
 }
 
-function Detail({ rec, onClose }) {
+// 全屏面板注册在 shell.overlay(frame-wide 浮层层, 位于所有列之上、滚动容器之外),
+// 关闭时渲染 null; 与侧栏按钮共享模块级 panelOpen 状态。
+function Overlay() {
+  const open = usePanelOpen()
+  if (!open) return null
+  return <Panel />
+}
+
+function Detail({ rec, onClose, rate }) {
   const st = statusInfo(rec)
+  const rateCny = Number(rate) > 0 ? Number(rate) : 7.2
   const rows = [
     ['会话 ID', rec.sessionId],
     ['时间', fmtTime(rec.time)],
@@ -179,7 +240,7 @@ function Detail({ rec, onClose }) {
     ['计费输入', fmtNum(rec.billedInput)],
     ['缓存命中率', rec.cacheHitPercent + '%'],
     ['总 Token', fmtNum(rec.totalTokens)],
-    ['消耗金额(估算)', fmtCost(rec.cost)],
+    ['消耗金额(估算)', fmtCost(rec.cost) + ' ≈ ' + fmtCostCny(rec.cost, rateCny)],
     ['推理强度', rec.effort || '—'],
     ['耗时', fmtDuration(rec.llmMs)],
     ['Turn / Step', rec.turn + ' / ' + rec.step],
@@ -202,8 +263,8 @@ function Detail({ rec, onClose }) {
 
 function Panel() {
   const open = usePanelOpen()
-  const [fromStr, setFromStr] = useState('')
-  const [toStr, setToStr] = useState('')
+  const [fromStr, setFromStr] = useState(() => defaultRange().from)
+  const [toStr, setToStr] = useState(() => defaultRange().to)
   const [provider, setProvider] = useState('')
   const [model, setModel] = useState('')
   const [status, setStatus] = useState('')
@@ -217,22 +278,26 @@ function Panel() {
   const [err, setErr] = useState('')
   const [page, setPage] = useState(0)
   const [detailRec, setDetailRec] = useState(null)
+  // 面板形态: full=全屏 / half=上半屏 / collapsed=折叠为悬浮条
+  const [mode, setMode] = useState('full')
+  const prevModeRef = useRef('full')
+  const changeMode = useCallback((m) => {
+    if (m !== 'collapsed') prevModeRef.current = m
+    setMode(m)
+  }, [])
   const pageSize = 100
 
   useEffect(() => {
     if (!open) return
     let cancel = false
     setLoading(true); setErr('')
+    // 首次打开: 扫描历史后按默认当天范围查询
+    const r0 = defaultRange()
     rpcCall('scan', {})
-      .then(() => (cancel ? null : rpcCall('query', {})))
+      .then(() => (cancel ? null : rpcCall('query', { from: new Date(r0.from).getTime(), to: new Date(r0.to).getTime() })))
       .then((d) => {
         if (cancel) return
         setData(d)
-        if (!fromStr && !toStr) {
-          const now = Date.now()
-          setFromStr(toLocalInput(now - 30 * 86400000))
-          setToStr(toLocalInput(now + 86400000))
-        }
       })
       .catch((e) => { if (!cancel) setErr(String((e && e.message) || e)) })
       .finally(() => { if (!cancel) setLoading(false) })
@@ -260,6 +325,18 @@ function Panel() {
       .finally(() => setLoading(false))
   }, [buildQ])
 
+  // 重置: 恢复默认当天时间范围 + 清空所有筛选, 并立即按默认条件查询
+  const resetFilters = useCallback(() => {
+    const r = defaultRange()
+    setFromStr(r.from); setToStr(r.to)
+    setProvider(''); setModel(''); setStatus(''); setEffort(''); setSessionId(''); setDim('')
+    setLoading(true); setErr('')
+    rpcCall('query', { from: new Date(r.from).getTime(), to: new Date(r.to).getTime() })
+      .then((d) => { setData(d); setPage(0) })
+      .catch((e) => setErr(String((e && e.message) || e)))
+      .finally(() => setLoading(false))
+  }, [])
+
   const exportCsv = useCallback(() => {
     rpcCall('export', buildQ(false))
       .then((d) => {
@@ -273,6 +350,18 @@ function Panel() {
       })
       .catch((e) => setErr(String((e && e.message) || e)))
   }, [buildQ])
+
+  // 自动刷新: 面板打开期间每 5s 按当前筛选静默刷新(不闪烁 loading), 折叠成悬浮条时也持续刷新。
+  // 注意: 依赖数组 [open, buildQ] 在声明时即求值, 必须放在 buildQ 定义之后(否则 TDZ 崩溃)。
+  useEffect(() => {
+    if (!open) return
+    const timer = setInterval(() => {
+      rpcCall('query', buildQ(true))
+        .then((d) => { setData(d); setErr('') })
+        .catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [open, buildQ])
 
   const toggleSort = useCallback((key) => {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
@@ -301,6 +390,10 @@ function Panel() {
   const pageSafe = Math.min(page, pageCount - 1)
   const pageRows = sorted.slice(pageSafe * pageSize, (pageSafe + 1) * pageSize)
 
+  // USD→CNY 汇率: host 返回(默认 7.2, 可被 settings token-usage.usdCnyRate 覆盖)。
+  // 注意: 必须在本文件所有引用它的表达式(cards/summaryRows/detailRows/Detail)之前声明。
+  const rateCny = (data && data.rateUsdCny) || 7.2
+
   const cards = totals ? [
     { v: fmtNum(totals.calls), l: '调用次数' },
     { v: fmtCompact(totals.totalTokens), l: '总 Token' },
@@ -309,16 +402,25 @@ function Panel() {
     { v: totals.cacheHitPct + '%', l: '缓存命中率' },
     { v: fmtCompact(totals.outputTokens), l: '输出' },
     { v: fmtCost(totals.cost), l: '消耗金额(估算)' },
+    { v: fmtCostCny(totals.cost, rateCny), l: '消耗金额(¥)' },
     { v: fmtDuration(totals.llmMs), l: '累计耗时' + (totals.timed ? ' (' + totals.timed + '步)' : '') },
   ] : []
 
   const opts = (arr) => (arr || []).map((x) => <option key={x || '(none)'} value={x}>{x || '(空)'}</option>)
 
+  // 模型下拉联动: 选中提供商后只显示该提供商下的模型; 未选提供商显示全部模型。
+  // modelsByProvider 由 host 返回({provider: [models]}), host 未升级时回退到全量 models。
+  const modelChoices = provider && data && data.modelsByProvider
+    ? (data.modelsByProvider[provider] || [])
+    : (data && data.models) || []
+
   const summaryRows = (data && data.summary || []).map((r) => (
     <tr key={r.key}>
       <td>{r.key}</td><td>{fmtNum(r.calls)}</td><td>{fmtCompact(r.inputTokens)}</td>
       <td>{fmtCompact(r.cacheReadTokens)}</td><td>{r.cacheHitPct + '%'}</td><td>{fmtCompact(r.outputTokens)}</td>
-      <td>{fmtCompact(r.totalTokens)}</td><td>{fmtCost(r.cost)}</td><td>{fmtDuration(r.llmMs)}</td>
+      <td>{fmtCompact(r.totalTokens)}</td>
+      <td><div>{fmtCost(r.cost)}</div><div className="tokuse-cny">{fmtCostCny(r.cost, rateCny)}</div></td>
+      <td>{fmtDuration(r.llmMs)}</td>
     </tr>
   ))
 
@@ -342,7 +444,7 @@ function Panel() {
         <td>{fmtNum(r.outputTokens)}</td>
         <td>{fmtNum(r.reasoningTokens)}</td>
         <td>{fmtNum(r.totalTokens)}</td>
-        <td>{fmtCost(r.cost)}</td>
+        <td><div>{fmtCost(r.cost)}</div><div className="tokuse-cny">{fmtCostCny(r.cost, rateCny)}</div></td>
         <td>{r.effort || '—'}</td>
         <td>
           <div><span className={'tokuse-code ' + st.cls}>{st.label}</span></div>
@@ -383,6 +485,15 @@ function Panel() {
   if (sorted.length === 0) {
     bodyNodes.push(<div key="empty" className="tokuse-empty">{loading ? '加载中…' : '无匹配记录'}</div>)
   } else {
+    // 分页控件: 明细表上方+下方各一份, 免去翻页时滑到底部
+    const pager = (key, cls) => (
+      <div key={key} className={'tokuse-pager ' + cls}>
+        <button className="tokuse-btn" disabled={pageSafe <= 0} onClick={() => setPage(pageSafe - 1)}>上一页</button>
+        <span>第 {pageSafe + 1} / {pageCount} 页 · 共 {sorted.length} 条</span>
+        <button className="tokuse-btn" disabled={pageSafe >= pageCount - 1} onClick={() => setPage(pageSafe + 1)}>下一页</button>
+      </div>
+    )
+    bodyNodes.push(pager('pager-top', 'top'))
     bodyNodes.push(
       <div key="detail" className="tokuse-table-wrap">
         <table className="tokuse-table">
@@ -394,20 +505,29 @@ function Panel() {
           </tr></thead>
           <tbody>{detailRows}</tbody>
         </table>
-      </div>,
-      <div key="pager" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--tokuse-dim, #9aa3b5)' }}>
-        <button className="tokuse-btn" disabled={pageSafe <= 0} onClick={() => setPage(pageSafe - 1)}>上一页</button>
-        <span>第 {pageSafe + 1} / {pageCount} 页</span>
-        <button className="tokuse-btn" disabled={pageSafe >= pageCount - 1} onClick={() => setPage(pageSafe + 1)}>下一页</button>
+      </div>
+    )
+    bodyNodes.push(pager('pager-bottom', 'bottom'))
+  }
+
+  // 折叠态: 右上角悬浮条, 点击展开回之前的形态(全屏/半屏), 不挡工作区
+  if (mode === 'collapsed') {
+    return (
+      <div className="tokuse-minibar" title="展开 Token 用量面板" onClick={(e) => { e.stopPropagation(); changeMode(prevModeRef.current) }}>
+        <span>⛃</span>
+        <span>Token 用量{loading ? ' …' : ''}</span>
+        <span className="lbl">展开</span>
       </div>
     )
   }
 
   return (
-    <div className="tokuse-overlay" onClick={(e) => e.stopPropagation()}>
+    <div className={'tokuse-overlay' + (mode === 'half' ? ' half' : '')} onClick={(e) => e.stopPropagation()}>
       <div className="tokuse-header">
         <span className="tokuse-title">Token 用量统计</span>
         <span className="tokuse-status">{loading ? '加载中…' : (data ? data.counts.matching + ' / ' + data.counts.total + ' 条' : '')}</span>
+        <button className="tokuse-close" title={mode === 'half' ? '切换全屏' : '切换上半屏'} onClick={() => changeMode(mode === 'half' ? 'full' : 'half')}>{mode === 'half' ? '⤢ 全屏' : '⤡ 半屏'}</button>
+        <button className="tokuse-close" title="折叠为悬浮条, 继续工作" onClick={() => changeMode('collapsed')}>— 收起</button>
         <button className="tokuse-close" onClick={() => setPanelOpen(false)}>✕ 关闭</button>
       </div>
       <div className="tokuse-filter">
@@ -420,12 +540,12 @@ function Panel() {
           <option value="">全部</option>{opts(sessionIds)}
         </select>
         <label>提供商</label>
-        <select className="tokuse-select" value={provider} onChange={(e) => setProvider(e.target.value)}>
+        <select className="tokuse-select" value={provider} onChange={(e) => { setProvider(e.target.value); setModel('') }}>
           <option value="">全部</option>{opts(data && data.providers)}
         </select>
         <label>模型</label>
         <select className="tokuse-select" value={model} onChange={(e) => setModel(e.target.value)}>
-          <option value="">全部</option>{opts(data && data.models)}
+          <option value="">全部</option>{opts(modelChoices)}
         </select>
         <label>状态</label>
         <select className="tokuse-select" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -436,22 +556,29 @@ function Panel() {
           <option value="">全部</option>{opts(data && data.efforts)}
         </select>
         <button className="tokuse-btn primary" onClick={runQuery}>查询</button>
+        <button className="tokuse-btn" onClick={resetFilters}>重置</button>
         <button className="tokuse-btn" onClick={exportCsv}>导出 CSV</button>
       </div>
       <div className="tokuse-body">{bodyNodes}</div>
-      {detailRec ? <Detail rec={detailRec} onClose={() => setDetailRec(null)} /> : null}
+      {detailRec ? <Detail rec={detailRec} onClose={() => setDetailRec(null)} rate={rateCny} /> : null}
     </div>
   )
 }
 
 export function apply(ctx) {
-  if (typeof styles !== 'undefined' && styles.insert) styles.insert(css)
+  insertCss(css)
   const slots = ctx.get('slots')
   if (!slots) return
-  // 自包含组件: 入口按钮 + 面板浮层, 注册在 设置旁边 的 additive action slot
+  // 入口按钮: 侧栏底部 设置 旁边 的 additive action slot
   slots.inject('sidebar.footer.action', () => slots.register(
     { name: 'sidebar.footer.action', id: 'token-usage', order: 10, label: 'Token 用量' },
     Launcher
+  ))
+  // 全屏面板: shell.overlay — frame-wide 浮层层, 位于所有列之上且在其滚动容器之外,
+  // 由 ui-layout 声明, 官方指定的全屏表面座位; 点击由条目自身 opt-in(面板开启时覆盖全框)。
+  slots.inject('shell.overlay', () => slots.register(
+    { name: 'shell.overlay', id: 'token-usage', order: 100, label: 'Token 用量面板' },
+    Overlay
   ))
 }
 
