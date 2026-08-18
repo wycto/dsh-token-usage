@@ -218,3 +218,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.tgz
+
+# npm 本地缓存重定向(沙箱内 --cache 指向工作区)
+.npm-cache/
+node_modules/

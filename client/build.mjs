@@ -25,14 +25,14 @@ const PACKAGE_ID = "@wycto/dsh-token-usage";
 
 function runEsbuild(args) {
   // npx 自动解析 esbuild (含 npx 缓存); Windows 下经 shell 调用
+  // stdio: inherit — esbuild 输出直通终端, 不捕获管道(沙箱/CI 下避免管道 EPERM)
   try {
     execSync(`npx --yes esbuild ${args.map((a) => JSON.stringify(a)).join(" ")}`, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: "inherit",
       shell: process.platform === "win32",
     });
   } catch (e) {
-    throw new Error(`esbuild failed: ${e.stderr || e.message}`);
+    throw new Error(`esbuild failed: ${e.message || e}`);
   }
 }
 

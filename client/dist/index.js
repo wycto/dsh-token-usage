@@ -195,8 +195,6 @@ const css = `
 .tokuse-minibar { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--tokuse-header, rgba(20,23,30,0.97)); border: 1px solid var(--tokuse-border, #3a4150); color: var(--tokuse-fg, #e8eaf0); font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
 .tokuse-minibar:hover { background: #2c3342; }
 .tokuse-minibar .lbl { color: var(--tokuse-dim, #9aa3b5); }
-/* \u4EBA\u6C11\u5E01\u91D1\u989D\u5C0F\u5B57 */
-.tokuse-cny { font-size: 11px; color: var(--tokuse-dim, #9aa3b5); }
 `;
 function Launcher(props) {
   const open = usePanelOpen();
@@ -399,10 +397,8 @@ function Panel() {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: r.cacheHitPct + "%" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCompact(r.outputTokens) }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCompact(r.totalTokens) }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: fmtCost(r.cost) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-cny", children: fmtCostCny(r.cost, rateCny) })
-    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCost(r.cost) }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCostCny(r.cost, rateCny) }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtDuration(r.llmMs) })
   ] }, r.key));
   const sortTh = (label, key) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("th", { onClick: () => toggleSort(key), title: "\u70B9\u51FB\u6392\u5E8F", children: [
@@ -425,10 +421,8 @@ function Panel() {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.outputTokens) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.reasoningTokens) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtNum(r.totalTokens) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: fmtCost(r.cost) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "tokuse-cny", children: fmtCostCny(r.cost, rateCny) })
-      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCost(r.cost) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: fmtCostCny(r.cost, rateCny) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: r.effort || "\u2014" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "tokuse-code " + st.cls, children: st.label }) }),
@@ -466,6 +460,7 @@ function Panel() {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "\u8F93\u51FA" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "\u603BToken" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "\u91D1\u989D" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "\u91D1\u989D(\xA5)" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "\u8017\u65F6" })
       ] }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: summaryRows })
@@ -510,6 +505,7 @@ function Panel() {
           sortTh("\u63A8\u7406", "reasoningTokens"),
           sortTh("\u603B\u989D", "totalTokens"),
           sortTh("\u91D1\u989D", "cost"),
+          sortTh("\u91D1\u989D(\xA5)", "cost"),
           sortTh("\u5F3A\u5EA6", "effort"),
           sortTh("\u72B6\u6001", "status"),
           sortTh("\u8017\u65F6", "llmMs")

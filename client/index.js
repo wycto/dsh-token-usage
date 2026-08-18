@@ -195,8 +195,6 @@ const css = `
 .tokuse-minibar { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--tokuse-header, rgba(20,23,30,0.97)); border: 1px solid var(--tokuse-border, #3a4150); color: var(--tokuse-fg, #e8eaf0); font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
 .tokuse-minibar:hover { background: #2c3342; }
 .tokuse-minibar .lbl { color: var(--tokuse-dim, #9aa3b5); }
-/* 人民币金额小字 */
-.tokuse-cny { font-size: 11px; color: var(--tokuse-dim, #9aa3b5); }
 `
 
 function Launcher(props) {
@@ -419,7 +417,8 @@ function Panel() {
       <td>{r.key}</td><td>{fmtNum(r.calls)}</td><td>{fmtCompact(r.inputTokens)}</td>
       <td>{fmtCompact(r.cacheReadTokens)}</td><td>{r.cacheHitPct + '%'}</td><td>{fmtCompact(r.outputTokens)}</td>
       <td>{fmtCompact(r.totalTokens)}</td>
-      <td><div>{fmtCost(r.cost)}</div><div className="tokuse-cny">{fmtCostCny(r.cost, rateCny)}</div></td>
+      <td>{fmtCost(r.cost)}</td>
+      <td>{fmtCostCny(r.cost, rateCny)}</td>
       <td>{fmtDuration(r.llmMs)}</td>
     </tr>
   ))
@@ -444,7 +443,8 @@ function Panel() {
         <td>{fmtNum(r.outputTokens)}</td>
         <td>{fmtNum(r.reasoningTokens)}</td>
         <td>{fmtNum(r.totalTokens)}</td>
-        <td><div>{fmtCost(r.cost)}</div><div className="tokuse-cny">{fmtCostCny(r.cost, rateCny)}</div></td>
+        <td>{fmtCost(r.cost)}</td>
+        <td>{fmtCostCny(r.cost, rateCny)}</td>
         <td>{r.effort || '—'}</td>
         <td>
           <div><span className={'tokuse-code ' + st.cls}>{st.label}</span></div>
@@ -467,7 +467,7 @@ function Panel() {
     <div key="sumtab" className="tokuse-table-wrap">
       <table className="tokuse-table">
         <thead><tr>
-          <th>维度</th><th>调用</th><th>输入</th><th>缓存</th><th>命中率</th><th>输出</th><th>总Token</th><th>金额</th><th>耗时</th>
+          <th>维度</th><th>调用</th><th>输入</th><th>缓存</th><th>命中率</th><th>输出</th><th>总Token</th><th>金额</th><th>金额(¥)</th><th>耗时</th>
         </tr></thead>
         <tbody>{summaryRows}</tbody>
       </table>
@@ -500,7 +500,7 @@ function Panel() {
           <thead><tr>
             {sortTh('时间', 'time')}{sortTh('会话ID', 'sessionId')}{sortTh('提供商', 'provider')}{sortTh('模型', 'model')}
             {sortTh('输入', 'inputTokens')}{sortTh('缓存', 'cacheReadTokens')}{sortTh('命中%', 'cacheHitPercent')}{sortTh('输出', 'outputTokens')}
-            {sortTh('推理', 'reasoningTokens')}{sortTh('总额', 'totalTokens')}{sortTh('金额', 'cost')}{sortTh('强度', 'effort')}
+            {sortTh('推理', 'reasoningTokens')}{sortTh('总额', 'totalTokens')}{sortTh('金额', 'cost')}{sortTh('金额(¥)', 'cost')}{sortTh('强度', 'effort')}
             {sortTh('状态', 'status')}{sortTh('耗时', 'llmMs')}
           </tr></thead>
           <tbody>{detailRows}</tbody>
