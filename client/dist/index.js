@@ -109,17 +109,28 @@ function fmtTime(ts) {
   const p = (x) => String(x).padStart(2, "0");
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
 }
-function toLocalInput(ts) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  const p = (x) => String(x).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+const STORE_KEY = "dsh-token-usage/filters/v1";
+const FILTER_FIELDS = ["fromStr", "toStr", "provider", "model", "status", "effort", "sessionId", "dim"];
+function loadSavedFilters() {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== "object") return null;
+    const out = {};
+    for (const k of FILTER_FIELDS) out[k] = typeof obj[k] === "string" ? obj[k] : "";
+    return out;
+  } catch (e) {
+    return null;
+  }
 }
-function defaultRange() {
-  const now = /* @__PURE__ */ new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  return { from: toLocalInput(start.getTime()), to: toLocalInput(end.getTime()) };
+function saveFilters(f) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(STORE_KEY, JSON.stringify(f));
+  } catch (e) {
+  }
 }
 function shortId(sid) {
   if (!sid) return "";
@@ -141,9 +152,12 @@ const css = `
 .tokuse-title { font-size: 16px; font-weight: 700; }
 .tokuse-close { margin-left: auto; cursor: pointer; border: 0; border-radius: 8px; background: var(--tokuse-btn, #333a47); color: inherit; padding: 8px 16px; font-size: 13px; }
 .tokuse-close:hover { background: #444c5c; }
-.tokuse-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--tokuse-border, #2a2f3a); background: var(--tokuse-header, rgba(20,23,30,0.9)); }
-.tokuse-filter label { font-size: 12px; color: var(--tokuse-dim, #9aa3b5); }
+.tokuse-filter { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding: 10px 12px; border-bottom: 1px solid var(--tokuse-border, #2a2f3a); background: var(--tokuse-header, rgba(20,23,30,0.9)); }
+.tokuse-filter label { font-size: 12px; color: var(--tokuse-dim, #9aa3b5); white-space: nowrap; flex: none; }
+.tokuse-filter .tokuse-btn, .tokuse-filter .tokuse-input, .tokuse-filter .tokuse-select { flex: none; }
 .tokuse-input, .tokuse-select { background: var(--tokuse-input, #232936); color: inherit; border: 1px solid var(--tokuse-border, #3a4150); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.tokuse-input[type="datetime-local"] { width: 168px; }
+.tokuse-select { max-width: 160px; }
 .tokuse-btn { cursor: pointer; border-radius: 6px; border: 1px solid var(--tokuse-border, #3a4150); background: var(--tokuse-btn, #2c3342); color: inherit; padding: 6px 12px; font-size: 12px; }
 .tokuse-btn:hover { background: var(--tokuse-btn-hover, #39425a); }
 .tokuse-btn.primary { background: #2f6fed; border-color: #2f6fed; color: #fff; }
@@ -248,14 +262,15 @@ function Detail({ rec, onClose, rate }) {
 }
 function Panel() {
   const open = usePanelOpen();
-  const [fromStr, setFromStr] = (0, import_react.useState)(() => defaultRange().from);
-  const [toStr, setToStr] = (0, import_react.useState)(() => defaultRange().to);
-  const [provider, setProvider] = (0, import_react.useState)("");
-  const [model, setModel] = (0, import_react.useState)("");
-  const [status, setStatus] = (0, import_react.useState)("");
-  const [effort, setEffort] = (0, import_react.useState)("");
-  const [sessionId, setSessionId] = (0, import_react.useState)("");
-  const [dim, setDim] = (0, import_react.useState)("");
+  const [savedFilters] = (0, import_react.useState)(loadSavedFilters);
+  const [fromStr, setFromStr] = (0, import_react.useState)(() => savedFilters && savedFilters.fromStr || "");
+  const [toStr, setToStr] = (0, import_react.useState)(() => savedFilters && savedFilters.toStr || "");
+  const [provider, setProvider] = (0, import_react.useState)(() => savedFilters && savedFilters.provider || "");
+  const [model, setModel] = (0, import_react.useState)(() => savedFilters && savedFilters.model || "");
+  const [status, setStatus] = (0, import_react.useState)(() => savedFilters && savedFilters.status || "");
+  const [effort, setEffort] = (0, import_react.useState)(() => savedFilters && savedFilters.effort || "");
+  const [sessionId, setSessionId] = (0, import_react.useState)(() => savedFilters && savedFilters.sessionId || "");
+  const [dim, setDim] = (0, import_react.useState)(() => savedFilters && savedFilters.dim || "");
   const [sortKey, setSortKey] = (0, import_react.useState)("time");
   const [sortDir, setSortDir] = (0, import_react.useState)("desc");
   const [data, setData] = (0, import_react.useState)(null);
@@ -271,12 +286,25 @@ function Panel() {
   }, []);
   const pageSize = 100;
   (0, import_react.useEffect)(() => {
+    saveFilters({ fromStr, toStr, provider, model, status, effort, sessionId, dim });
+  }, [fromStr, toStr, provider, model, status, effort, sessionId, dim]);
+  (0, import_react.useEffect)(() => {
     if (!open) return;
     let cancel = false;
     setLoading(true);
     setErr("");
-    const r0 = defaultRange();
-    rpcCall("scan", {}).then(() => cancel ? null : rpcCall("query", { from: new Date(r0.from).getTime(), to: new Date(r0.to).getTime() })).then((d) => {
+    const q = {};
+    if (savedFilters) {
+      if (savedFilters.fromStr) q.from = new Date(savedFilters.fromStr).getTime();
+      if (savedFilters.toStr) q.to = new Date(savedFilters.toStr).getTime();
+      if (savedFilters.provider) q.provider = savedFilters.provider;
+      if (savedFilters.model) q.model = savedFilters.model;
+      if (savedFilters.status) q.status = savedFilters.status;
+      if (savedFilters.effort) q.effort = savedFilters.effort;
+      if (savedFilters.sessionId) q.sessionId = savedFilters.sessionId;
+      if (savedFilters.dim) q.dim = savedFilters.dim;
+    }
+    rpcCall("scan", {}).then(() => cancel ? null : rpcCall("query", q)).then((d) => {
       if (cancel) return;
       setData(d);
     }).catch((e) => {
@@ -287,7 +315,7 @@ function Panel() {
     return () => {
       cancel = true;
     };
-  }, [open]);
+  }, [open, savedFilters]);
   const buildQ = (0, import_react.useCallback)((withDim) => {
     const q = {};
     if (fromStr) q.from = new Date(fromStr).getTime();
@@ -309,9 +337,8 @@ function Panel() {
     }).catch((e) => setErr(String(e && e.message || e))).finally(() => setLoading(false));
   }, [buildQ]);
   const resetFilters = (0, import_react.useCallback)(() => {
-    const r = defaultRange();
-    setFromStr(r.from);
-    setToStr(r.to);
+    setFromStr("");
+    setToStr("");
     setProvider("");
     setModel("");
     setStatus("");
@@ -320,7 +347,7 @@ function Panel() {
     setDim("");
     setLoading(true);
     setErr("");
-    rpcCall("query", { from: new Date(r.from).getTime(), to: new Date(r.to).getTime() }).then((d) => {
+    rpcCall("query", {}).then((d) => {
       setData(d);
       setPage(0);
     }).catch((e) => setErr(String(e && e.message || e))).finally(() => setLoading(false));
